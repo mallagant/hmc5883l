@@ -92,7 +92,7 @@ class hmc5883l:
 
 if __name__ == "__main__":
     # http://magnetic-declination.com/Great%20Britain%20(UK)/Harrogate#
-    compass = hmc5883l(gauss = 4.7, declination = (-2,5))
+    compass = hmc5883l(gauss = 4.7, declination = (-1,14))
     while True:
         sys.stdout.write("\rHeading: " + str(compass.degrees(compass.heading())) + "     ")
         sys.stdout.flush()
