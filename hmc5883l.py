@@ -6,7 +6,7 @@
 # but uses smbus rather than quick2wire and sets some different init
 # params.
 
-import smbus
+from machine import I2C, Pin
 import math
 import time
 import sys
@@ -24,14 +24,18 @@ class hmc5883l:
         8.10: [7, 4.35],
     }
 
-    def __init__(self, port=1, address=0x1e, gauss=1.3):
-        self.bus = smbus.SMBus(port)
+    def __init__(self, i2c=None, scl=None, sda=None, address=0x1e, gauss=1.3):
+        if i2c is not None:
+            self.bus = i2c
+        else:
+            self.bus = I2C(-1, Pin(scl), Pin(sda))
         self.address = address
 
         (reg, self.__scale) = self.__scales[gauss]
-        self.bus.write_byte_data(self.address, 0x00, 0x70) # 8 Average, 15 Hz, normal measurement
-        self.bus.write_byte_data(self.address, 0x01, reg << 5) # Scale
-        self.bus.write_byte_data(self.address, 0x02, 0x00) # Continuous measurement
+        # 8 Average, 15 Hz, normal measurement
+        # Scale
+        # Continuous measurement
+        i2c.writeto_mem(self.address, 0x00, bytes([0x70, reg << 5, 0x00]))
 
     def twos_complement(self, val, len):
         # Convert twos compliment to integer
@@ -45,10 +49,10 @@ class hmc5883l:
         return round(val * self.__scale, 4)
 
     def axes(self):
-        data = self.bus.read_i2c_block_data(self.address, 0x00)
-        x = self.__convert(data, 3)
-        y = self.__convert(data, 7)
-        z = self.__convert(data, 5)
+        data = self.bus.readfrom_mem(self.address,  0x03, 6)
+        x = self.__convert(data, 0)
+        y = self.__convert(data, 4)
+        z = self.__convert(data, 2)
         return (x,y,z)
 
 
