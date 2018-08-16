@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # vim: set fileencoding=UTF-8 :
 
-# Based on code for the HMC5888L Magnetometer (Digital Compass), but this is
+# Based on bluezio modification of code for the HMC5888L Magnetometer (Digital Compass), but this is
 # for the QMC5883L Magnetometer component. It has the same function but it
 # works quite differently!
+# This version uses MicroPython for ESP8266
 
-import smbus
+from machine import I2C, Pin
 import math
 import time
 import sys
@@ -15,10 +16,13 @@ class qmc5883l:
     REG_SET_RESET = 0x0b
     REG_STATUS = 0x06
 
-    def __init__(self, port=1, address=0x0d):
-        self.bus = smbus.SMBus(port)
+    def __init__(self, i2c=None, scl=None, sda=None, port=1, address=0x0d):
+        if i2c is not None:
+            self.bus = i2c
+        else:
+            self.bus = I2C(-1, Pin(scl), Pin(sda))
         self.address = address
-        self.bus.write_byte_data(self.address, self.REG_SET_RESET, 0x01) # turn on
+        self.bus.writeto_mem(self.address, self.REG_SET_RESET, bytes([0x01])) # turn on
 
         # 09H OSR[1:0] RNG[1:0] ODR[1:0] MODE[1:0]
         # Value 00      01         10      11
@@ -26,7 +30,8 @@ class qmc5883l:
         # RNG   2G      8G         Reserve Reserve
         # ODR   10Hz    50Hz       100Hz   200Hz
         # Mode  Standby Continuous Reserve Reserve
-        self.bus.write_byte_data(self.address, self.REG_MODE, 0b00001101) # OSR=512, RNG=2G, ODR=200Hz, Mode=Continuous
+        self.bus.writeto_mem(self.address, self.REG_MODE, bytes([0b00001101])) # OSR=512, RNG=2G, ODR=200Hz, Mode=Continuous
+
 
     def twos_complement(self, val, len):
         # Convert twos complement to integer
@@ -38,10 +43,10 @@ class qmc5883l:
         return self.twos_complement(data[offset+1] << 8 | data[offset], 16)
 
     def isReady(self):
-        return (self.bus.read_byte_data(self.address, self.REG_STATUS) & 1) > 0
+        return (self.bus.readfrom_mem(self.address,  self.REG_STATUS, 1)[0] & 1) > 0
 
     def axes(self):
-        data = self.bus.read_i2c_block_data(self.address, 0x00, 6)
+        data = self.bus.readfrom_mem(self.address,  0x00, 6)
         x = self.__convert(data, 0)
         y = self.__convert(data, 2)
         z = self.__convert(data, 4)
